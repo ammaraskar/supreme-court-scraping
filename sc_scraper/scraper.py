@@ -6,7 +6,7 @@ from sc_scraper import case_code
 
 
 def cleanup_text(text):
-    return text.replace("\xA0", " ").strip().strip(")*#")
+    return text.replace("\xA0", " ").strip().lstrip(")*#,").rstrip(",")
 
 
 class GrantedCasesSpider(scrapy.Spider):
@@ -23,6 +23,12 @@ class GrantedCasesSpider(scrapy.Spider):
             yield response.follow(year, self.parse_year_page)
 
     def parse_year_page(self, response):
+        # Probably a nicer way to do this but shrug ¯\_(ツ)_/¯
+        match = re.search(r"grantednotedlist\/(\d\d)grantednotedlist", response.url)
+        term = None
+        if match:
+            term = "20" + match.group(1)
+
         case_headings = response.xpath('//div[@class="WordSection1"]//a/..')
 
         for heading in case_headings:
@@ -30,6 +36,8 @@ class GrantedCasesSpider(scrapy.Spider):
             docket_id = heading.xpath("a/text()").get()
             if not docket_id:
                 continue
+            docket_id = cleanup_text(docket_id)
+            docket_id = docket_id.replace(", Orig.", " ORIG")
             # Make sure we have a title.
             title = heading.xpath("text()").get()
             if not title:
@@ -55,7 +63,7 @@ class GrantedCasesSpider(scrapy.Spider):
                 "./ancestor::p/following-sibling::p/span/text()"
             ).get()
             date_granted = cleanup_text(date_granted).lower()
-            m = re.search("(\d\d?/\d\d?/\d\d)", date_granted)
+            m = re.search(r"\d\d?/\d\d?/\d\d", date_granted)
             if m:
                 date_granted = datetime.datetime.strptime(m.group(0), "%m/%d/%y")
             else:
@@ -73,6 +81,7 @@ class GrantedCasesSpider(scrapy.Spider):
                 "docket_id": docket_id,
                 "case_code_info": code,
                 "title": title,
-                "date_granted": date_granted,
+                "date_granted": date_granted.timestamp(),
+                "term": term,
             }
             yield final_info

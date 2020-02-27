@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 
 cases.json
+oyez_data.json

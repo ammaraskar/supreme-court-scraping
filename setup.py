@@ -18,6 +18,6 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,
-    install_requires=["scrapy"],
+    install_requires=["scrapy", "requests"],
     extras_require={"test": ["pytest", "coverage", "black"]},
 )

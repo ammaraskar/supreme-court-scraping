@@ -1,5 +1,8 @@
 # supreme-court-scraping
-Scraping data from the Supreme Court website to gather case data.
+
+Scraping from the Supreme Court website to gather data on granted cases. Then
+merges it with data from the [Oyez](https://www.oyez.org/) api for a fuller list
+of cases.
 
 ## Usage
 
@@ -7,7 +10,26 @@ Scraping data from the Supreme Court website to gather case data.
 $ scrapy runspider sc_scraper/scraper.py -o cases.json
 ```
 
-Will run the scrapper and output the cases to a `cases.json` file.
+Will run the scrapper and output the granted cases to a `cases.json` file.
+
+```
+$ python -m sc_scraper
+```
+
+will then merge the data with the Oyez data for a fully populated
+`case_summaries.json` file.
+
+### Schema
+
+The schema of the `case_summaries.json` file is as follows:
+
+```json
+{
+    "docket_number": {
+        
+    }
+}
+```
 
 ## Installation
 
