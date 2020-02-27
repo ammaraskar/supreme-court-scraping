@@ -21,14 +21,30 @@ will then merge the data with the Oyez data for a fully populated
 
 ### Schema
 
-The schema of the `case_summaries.json` file is as follows:
+The cases in `case_summaries.json` are sorted by their dates (newest on top)
+and have this schema:
 
 ```json
-{
-    "docket_number": {
-        
-    }
-}
+[
+    {
+        "docket_number": "The docket number used to reference the case in court",
+        "date": "The last known date assosciated with the case",
+        "title": "Plantiff v. Defendant (e.g Roe v. Wade)",
+        "details_url": "Link to more details on the case (if available)",
+        "term": "Which term of the Supreme Court the case was brought forward (if available)",
+        "description": "A basic description of the case (if available)",
+        "question": "The questions put forth in the case (if available)"
+    },
+    {
+        "docket_number": "70-18",
+        "date": "1973-01-22 06:00:00",
+        "title": "Roe v. Wade",
+        "details_url": "https://api.oyez.org/cases/1971/70-18",
+        "term": "1971",
+        "description": "A case in which the court held that a woman's right to an abortion fell within the right to privacy granted in the Fourteenth Amendment.",
+        "question": "<p>Does the Constitution embrace a woman's right to terminate her pregnancy by abortion?</p>\n"
+    },
+]
 ```
 
 ## Installation
