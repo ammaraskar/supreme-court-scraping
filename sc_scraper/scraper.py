@@ -55,7 +55,7 @@ class GrantedCasesSpider(scrapy.Spider):
                 "./ancestor::p/following-sibling::p/span/text()"
             ).get()
             date_granted = cleanup_text(date_granted).lower()
-            m = re.search('(\d\d?/\d\d?/\d\d)', date_granted)
+            m = re.search("(\d\d?/\d\d?/\d\d)", date_granted)
             if m:
                 date_granted = datetime.datetime.strptime(m.group(0), "%m/%d/%y")
             else:
