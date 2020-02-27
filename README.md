@@ -4,8 +4,10 @@ Scraping data from the Supreme Court website to gather case data.
 ## Usage
 
 ```
-$ python -m sc-scraper
+$ scrapy runspider sc_scraper/scraper.py -o cases.json
 ```
+
+Will run the scrapper and output the cases to a `cases.json` file.
 
 ## Installation
 
