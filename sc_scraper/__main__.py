@@ -1,7 +1,16 @@
 from pathlib import Path
-import requests
+import collections
 import json
+import requests
 from datetime import datetime, timedelta
+
+
+base_folder = Path(__file__) / ".." / ".."
+OYEZ_DATA_FILE = base_folder / "oyez_data" / "oyez_data.json"
+OYEZ_CATEGORY_FILE = base_folder / "oyez_data" / "oyez_categories.json"
+OYEZ_CATEGORY_FOLDER = base_folder / "oyez_data" / "categories"
+
+OYEZ_CATEGORY_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
 def parse_unix_timestamp_even_negative(timestamp):
@@ -10,16 +19,22 @@ def parse_unix_timestamp_even_negative(timestamp):
 
 
 def main():
-    base_folder = Path(__file__) / ".." / ".."
-
-    oyez_data_file = base_folder / "oyez_data.json"
-    if not oyez_data_file.exists():
-        download_oyez_data(oyez_data_file)
-
-    with open(oyez_data_file, "r") as f:
+    download_oyez_data()
+    with open(OYEZ_DATA_FILE, "r") as f:
         oyez_data = json.load(f)
-    with open(base_folder / "cases.json", "r") as f:
-        latest_confirmed = json.load(f)
+    with open(OYEZ_CATEGORY_FILE, "r") as f:
+        oyez_categories = json.load(f)
+    categories, case_categories = download_and_load_category_data(oyez_categories)
+
+    with open(base_folder / "categories.json", "w") as f:
+        categories_by_id = {}
+        for category in categories:
+            categories_by_id[category.id] = category.name
+        json.dump(categories_by_id, f, indent=4)
+
+    # Latest data is disabled until pdf files can be processed.
+    #with open(base_folder / "cases.json", "r") as f:
+    #    latest_confirmed = json.load(f)
 
     case_summaries = {}
     for docket_object in oyez_data:
@@ -38,8 +53,15 @@ def main():
             if old_case["date"] > last_event_time:
                 continue
 
+        decided = False
+        for event in docket_object["timeline"]:
+            if event["event"] == "Decided":
+                decided = True
+
         case_summaries[docket_number] = {
             "docket_number": docket_object["docket_number"],
+            "decided": decided,
+            "categories": case_categories[docket_object["ID"]],
             "date": last_event_time,
             "title": docket_object["name"],
             "details_url": docket_object["href"],
@@ -48,6 +70,22 @@ def main():
             "question": docket_object["question"],
         }
 
+    # See above for why this is disabled.
+    #merge_with_latest_data(case_summaries, latest_confirmed)
+
+    # Order the cases by date
+    sorted_by_time = sorted(
+        case_summaries.values(), key=lambda x: x["date"], reverse=True
+    )
+    cases = []
+    for c in sorted_by_time:
+        cases.append(case_summaries[c["docket_number"]])
+
+    with open(base_folder / "case_summaries.json", "w") as f:
+        json.dump(cases, f, indent=4, default=str)
+
+
+def merge_with_latest_data(case_summaries, latest_confirmed):
     for case in latest_confirmed:
         # If we already have oyez data for this case, no need to use ours.
         docket_number = case["docket_id"]
@@ -65,26 +103,75 @@ def main():
         }
         print(docket_number)
 
-    # Order the cases by date
-    sorted_by_time = sorted(
-        case_summaries.values(), key=lambda x: x["date"], reverse=True
-    )
+
+def download_oyez_data():
+    if not OYEZ_DATA_FILE.exists():
+        r = requests.get(
+            "https://raw.githubusercontent.com/walkerdb/supreme_court_transcripts/master/oyez/case_summaries.json"
+        )
+        r.raise_for_status()
+        with open(OYEZ_DATA_FILE, "w") as f:
+            f.write(r.text)
+
+    if not OYEZ_CATEGORY_FILE.exists():
+        r = requests.get(
+            "https://api.oyez.org/info/case_issues"
+        )
+        r.raise_for_status()
+        with open(OYEZ_CATEGORY_FILE, "w") as f:
+            f.write(r.text)
+
+
+Category = collections.namedtuple('Category', ['id', 'name'])
+
+
+def crawl_sub_categories(sub_categories, categories):    
+    if "children" not in categories:
+        return
+    for category in categories["children"]:
+        crawl_sub_categories(sub_categories, category)
+        c = Category(category["id"], category["name"])
+        sub_categories.append(c)
+
+
+def download_single_category(category_id):
+    category_file = OYEZ_CATEGORY_FOLDER / "{}.json".format(category_id)
+    if category_file.exists():
+        with open(category_file, "r") as f:
+            cases = json.load(f)
+        return cases
+    # Hacky throttling
+    import time
+    time.sleep(0.1)
+
     cases = []
-    for c in sorted_by_time:
-        cases.append(case_summaries[c["docket_number"]])
-
-    with open(base_folder / "case_summaries.json", "w") as f:
-        json.dump(cases, f, indent=4, default=str)
-
-
-def download_oyez_data(file_to_save_to):
-    r = requests.get(
-        "https://raw.githubusercontent.com/walkerdb/supreme_court_transcripts/master/oyez/case_summaries.json"
+    r = requests.get("https://api.oyez.org/cases", 
+        params={"filter": "issue:{}".format(category_id)}
     )
+    print("Downloading ", category_id)
     r.raise_for_status()
+    for case in r.json():
+        cases.append(case["ID"])
+    with open(category_file, "w") as f:
+        json.dump(cases, f)
+    return cases
 
-    with open(file_to_save_to, "w") as f:
-        f.write(r.text)
+
+def download_and_load_category_data(categories):
+    category_ids = []
+    cases_to_categories = collections.defaultdict(list)
+
+    for category in categories:
+        c = Category(category["id"], category["name"])
+        category_ids.append(c)
+        crawl_sub_categories(category_ids, category)
+
+    for category in category_ids:
+        cases = download_single_category(category.id)
+        for case_id in cases:
+            cases_to_categories[case_id].append(category.id)
+
+    return category_ids, cases_to_categories
 
 
 if __name__ == "__main__":
