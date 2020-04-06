@@ -38,7 +38,8 @@ def main():
 
     case_summaries = {}
     for docket_object in oyez_data:
-        docket_number = docket_object["docket_number"]
+        #docket_number = docket_object["docket_number"]
+        docket_number = docket_object["href"].split("/")[-1].strip()
 
         # Grab the date of the last event in the timeline
         last_event_time = docket_object["timeline"]
@@ -59,7 +60,7 @@ def main():
                 decided = True
 
         case_summaries[docket_number] = {
-            "docket_number": docket_object["docket_number"],
+            "docket_number": docket_number,
             "decided": decided,
             "categories": case_categories[docket_object["ID"]],
             "date": last_event_time,
